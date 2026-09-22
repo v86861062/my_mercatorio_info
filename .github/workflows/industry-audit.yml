@@ -35,7 +35,6 @@ jobs:
           python - <<'PY'
           import base64,gzip,json,pathlib,hashlib
           encoded=''.join(pathlib.Path(f'audit/payload-{i}.b64').read_text().strip() for i in range(4))
-          # Correct four transcription differences; the complete checksum must still match.
           for old,new in [('VSsrWrWr2','VSsrWr2'),('HPOqVqVfq','HPOqVqVYfq'),('e9daHz5','e9Hz5'),('TdXrYrYID','TdXrYID')]:
             encoded=encoded.replace(old,new)
           assert hashlib.sha256(encoded.encode()).hexdigest()=='fa8b7ad991d37a760b2b617c137483df70e96c7d1ea1900a8e0e6e6b811bebe6'
@@ -50,6 +49,7 @@ jobs:
               pathlib.Path(name).write_text(text)
             print(name,hashlib.sha256(text.encode()).hexdigest())
           PY
+          python audit/refine.py
       - name: Install isolated rendering and browser test dependencies
         run: |
           sudo apt-get update -qq
