@@ -1,5 +1,6 @@
 {
   "parts": ["audit/fixes-0.b64", "audit/fixes-1.b64", "audit/fixes-2.b64", "audit/fixes-3.b64"],
   "transfer_repairs": [["XWRVVfRStWdpkDj", "XWRVfRStWdpkDj"], ["vPbrVbdV/Vbdx", "vPbrV/Vbdx"], ["HBJJVVcFj1Mxd", "HBJJVcFj1Mxd"]],
-  "sha256": "e61473e3be0e7b902bc3590ceec1ef3e2125fdada72e45abd9933de5037adbaf"
+  "sha256": "e61473e3be0e7b902bc3590ceec1ef3e2125fdada72e45abd9933de5037adbaf",
+  "live_commit": "130dbdadd31e364e51aad60b5fb679b1804909a1"
 }
