@@ -42,7 +42,10 @@ jobs:
           import pathlib,base64,gzip,json,hashlib
           spec=json.loads(pathlib.Path('audit/fixes-ready').read_text())
           encoded=''.join(pathlib.Path(p).read_text().strip() for p in spec['parts'])
-          raw=gzip.decompress(base64.b64decode(encoded))
+          for old,new in spec.get('transfer_repairs',[]):
+            assert encoded.count(old)==1,('Transfer normalization count',old)
+            encoded=encoded.replace(old,new)
+          raw=gzip.decompress(base64.b64decode(encoded,validate=True))
           assert hashlib.sha256(raw).hexdigest()==spec['sha256']
           files=json.loads(raw)
           assert set(files)=={'patch.py','verify.py'}
@@ -87,6 +90,7 @@ jobs:
           name: industry-fixes-evidence
           path: |
             _report/
+            audit/
             industry/
             assets/
             index.html
