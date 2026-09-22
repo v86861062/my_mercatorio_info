@@ -21,6 +21,15 @@ assert upgrade_checks==343
 '''
 t=t.replace(marker, checks+marker)
 t=t.replace("'raw_recipes_exact':694,", "'raw_recipes_exact':694,'upgrade_references_exact':upgrade_checks,")
+old="   cdp=context.new_cdp_session(page);cdp.send('Input.synthesizeScrollGesture',{'x':box['x']+box['width']/2,'y':min(box['y']+box['height']/2,750),'xDistance':-110,'yDistance':-100,'gestureSourceType':'touch','speed':450})"
+new="""   cdp=context.new_cdp_session(page);x=box['x']+box['width']/2;y=min(box['y']+box['height']/2,750)
+   cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':y}]})
+   for step in range(1,10):
+    cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x-step*10,'y':y-step*10}]});page.wait_for_timeout(30)
+   cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})"""
+assert old in t
+# Dispatch an actual touch sequence. Chromium's synthetic scroll emitted only pointermoves.
+t=t.replace(old,new)
 p.write_text(t)
 # Preserve English source units where a Chinese equivalent would be ambiguous.
 if not Path('audit/ready').read_text().startswith('live:'):
