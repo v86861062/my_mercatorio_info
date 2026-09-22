@@ -19,12 +19,15 @@ jobs:
           git rev-parse HEAD > _report/checkout-head.txt
           git ls-tree -r HEAD > _report/checkout-tree.txt
           python - <<'PY'
-          import pathlib,urllib.request,re,hashlib,json,datetime
+          import pathlib,urllib.request,urllib.parse,re,hashlib,json,datetime,gzip
+          def read(url):
+            data=urllib.request.urlopen(url,timeout=30).read()
+            return gzip.decompress(data) if data.startswith(b'\x1f\x8b') else data
           home='https://play.mercatorio.io/'
-          page=urllib.request.urlopen(home,timeout=30).read().decode()
+          page=read(home).decode()
           asset=re.search(r'(?:src=")([^" ]*main\.[^" ]+\.js)',page).group(1)
           url=urllib.parse.urljoin(home,asset)
-          data=urllib.request.urlopen(url,timeout=30).read()
+          data=read(url)
           sha=hashlib.sha256(data).hexdigest()
           assert sha=='5f30ff16df6960e2b8986d2db17c79d71861e8688195493ef1ef355cac91f11a',('Source changed; re-audit required',sha)
           pathlib.Path('_report/source/main.js').write_bytes(data)
