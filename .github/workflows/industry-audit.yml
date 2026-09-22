@@ -1,0 +1,39 @@
+name: Industry source audit
+on:
+  push:
+    branches: [audit/industry-20260922]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read anonymous official source and preserve evidence
+        run: |
+          mkdir -p audit-source
+          python - <<'PY'
+          import urllib.request, hashlib, pathlib, json, datetime
+          url='https://play.mercatorio.io/static/js/main.c8796e47.js'
+          data=urllib.request.urlopen(url, timeout=60).read()
+          digest=hashlib.sha256(data).hexdigest()
+          assert digest=='5f30ff16df6960e2b8986d2db17c79d71861e8688195493ef1ef355cac91f11a', digest
+          pathlib.Path('audit-source/main.c8796e47.js').write_bytes(data)
+          meta={'url':url,'sha256':digest,'fetched_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'authenticated':False,'scope':'anonymous official frontend, not account data'}
+          pathlib.Path('audit-source/source.json').write_text(json.dumps(meta,indent=2))
+          print(json.dumps(meta))
+          print('METADATA PREVIEW:', data.decode()[3057250:3058400])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: industry-source-and-current-site
+          path: |
+            audit-source/
+            assets/
+            industry/
+            town/
+            index.html
+          retention-days: 3
