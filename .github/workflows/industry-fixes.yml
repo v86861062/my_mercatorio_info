@@ -1,0 +1,91 @@
+name: Industry fixes verification
+on:
+  push:
+    branches: [audit/industry-fixes-20260922]
+    paths: [.github/workflows/industry-fixes.yml, audit/fixes-ready]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Capture checked-out repository and current anonymous official source
+        run: |
+          mkdir -p _report/source
+          git rev-parse HEAD > _report/checkout-head.txt
+          git ls-tree -r HEAD > _report/checkout-tree.txt
+          python - <<'PY'
+          import pathlib,urllib.request,re,hashlib,json,datetime
+          home='https://play.mercatorio.io/'
+          page=urllib.request.urlopen(home,timeout=30).read().decode()
+          asset=re.search(r'(?:src=")([^" ]*main\.[^" ]+\.js)',page).group(1)
+          url=urllib.parse.urljoin(home,asset)
+          data=urllib.request.urlopen(url,timeout=30).read()
+          sha=hashlib.sha256(data).hexdigest()
+          assert sha=='5f30ff16df6960e2b8986d2db17c79d71861e8688195493ef1ef355cac91f11a',('Source changed; re-audit required',sha)
+          pathlib.Path('_report/source/main.js').write_bytes(data)
+          info={'url':url,'sha256':sha,'fetched_at':datetime.datetime.now(datetime.timezone.utc).isoformat()}
+          pathlib.Path('_report/source/source.json').write_text(json.dumps(info,indent=2))
+          print(json.dumps(info))
+          PY
+      - name: Unpack reviewed patch and tests
+        if: hashFiles('audit/fixes-ready') != ''
+        run: |
+          python - <<'PY'
+          import pathlib,base64,gzip,json,hashlib
+          spec=json.loads(pathlib.Path('audit/fixes-ready').read_text())
+          encoded=''.join(pathlib.Path(p).read_text().strip() for p in spec['parts'])
+          raw=gzip.decompress(base64.b64decode(encoded))
+          assert hashlib.sha256(raw).hexdigest()==spec['sha256']
+          files=json.loads(raw)
+          assert set(files)=={'patch.py','verify.py'}
+          pathlib.Path('_runtime').mkdir(exist_ok=True)
+          for name,text in files.items(): pathlib.Path('_runtime',name).write_text(text)
+          if spec.get('live_commit'):
+            import subprocess
+            target=spec['live_commit']
+            assert len(target)==40 and all(c in '0123456789abcdef' for c in target)
+            subprocess.run(['git','fetch','origin',target],check=True)
+            subprocess.run(['git','worktree','add','--detach','_live',target],check=True)
+          PY
+      - name: Apply narrow patch to the captured current files
+        if: hashFiles('audit/fixes-ready') != ''
+        run: |
+          if ! grep -q 'live_commit' audit/fixes-ready; then python _runtime/patch.py; fi
+      - name: Install browser tests
+        if: hashFiles('audit/fixes-ready') != ''
+        run: |
+          python -m pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Check data and real browser interactions
+        if: hashFiles('audit/fixes-ready') != ''
+        run: python _runtime/verify.py
+      - name: Save only tested industry files on isolation branch
+        if: hashFiles('audit/fixes-ready') != ''
+        run: |
+          if grep -q 'live_commit' audit/fixes-ready; then exit 0; fi
+          git fetch origin audit/industry-fixes-20260922
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add industry/tree.html assets/industry-tree.js assets/industry-tree.css
+          git diff --cached --name-only
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git diff --cached --quiet || git commit -m 'fix(industry): tested readable details, shared aliases, facility trace and exact fit'
+          git push origin HEAD:audit/industry-fixes-20260922
+          git rev-parse HEAD
+          git ls-tree -r HEAD
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: industry-fixes-evidence
+          path: |
+            _report/
+            industry/
+            assets/
+            index.html
+            town/
+          retention-days: 7
