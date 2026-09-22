@@ -44,3 +44,19 @@
   .industry-tree-page .atlas-site-nav,
   .industry-tree-page .skip-link { display: none !important; }
 }
+
+/* Recipe correction only; loaded exclusively by industry/tree.html. */
+.industry-tree-page .drawer pre,.industry-tree-page .dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7f8;padding:12px;border-radius:7px;font-size:11px;line-height:1.6}
+.industry-tree-page code,.industry-tree-page .en,.industry-tree-page .source-table td{overflow-wrap:anywhere}
+.industry-tree-page .drawer{width:min(440px,calc(100vw - 24px))}
+.industry-tree-page .results{max-height:420px;overflow:auto}
+.industry-tree-page .flow-svg .node.selected>rect{stroke:#107c71;stroke-width:3px}
+.industry-tree-page .flow-svg .edge.hot>path{stroke-width:2.6px}
+.industry-tree-page .flow-svg .edge.cycle-edge.hot>path{stroke:#8856a5}
+.industry-tree-page #loading-status{padding:12px;border:1px solid #dbe3e4;border-radius:8px;background:#fff}
+.industry-tree-page #loading-status[hidden]{display:none}
+.industry-tree-page #graph-counts{margin:0 0 5px;font-weight:600}
+.industry-tree-page .mini-canvas{height:405px}
+.industry-tree-page .history-switch{max-width:100%;overflow-wrap:anywhere}
+.industry-tree-page .rbox .flow{line-height:1.9}
+@media(max-width:590px){.industry-tree-page .drawer{width:auto}.industry-tree-page .mini-canvas{height:390px}.industry-tree-page .guide-main{flex-wrap:wrap}.industry-tree-page .source-table th:nth-child(3),.industry-tree-page .source-table td:nth-child(3){display:table-cell}}
