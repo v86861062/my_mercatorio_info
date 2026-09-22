@@ -60,3 +60,17 @@
 .industry-tree-page .history-switch{max-width:100%;overflow-wrap:anywhere}
 .industry-tree-page .rbox .flow{line-height:1.9}
 @media(max-width:590px){.industry-tree-page .drawer{width:auto}.industry-tree-page .mini-canvas{height:390px}.industry-tree-page .guide-main{flex-wrap:wrap}.industry-tree-page .source-table th:nth-child(3),.industry-tree-page .source-table td:nth-child(3){display:table-cell}}
+
+/* Readable facility details and source disclosures; confined to this page. */
+.industry-tree-page .condition-summary{margin:8px 0;padding-left:20px;line-height:1.7}
+.industry-tree-page .official-name{display:block;color:#617780;overflow-wrap:anywhere;font-size:11px;margin:3px 0 6px}
+.industry-tree-page .facility-class,.industry-tree-page .facility-outputs{margin:9px 0;line-height:1.6}
+.industry-tree-page .source-details,.industry-tree-page .upgrade-summary{border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin:12px 0;background:#f8fafb}
+.industry-tree-page summary{cursor:pointer;line-height:1.5;overflow-wrap:anywhere}
+.industry-tree-page summary:focus-visible{outline:2px solid #107c71;outline-offset:3px}
+.industry-tree-page .facility-recipe{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:10px 0}
+.industry-tree-page .facility-recipe p{margin:6px 0}
+.industry-tree-page .facility-recipe>.tiny-btn{font-weight:650;font-size:14px}
+.industry-tree-page .facility-recipe .rbox{margin:10px 0 0}
+.industry-tree-page .canvas-inner>.flow-svg{flex:none;max-width:none}
+@media(max-width:590px){.industry-tree-page .drawer-body{padding:12px 15px 20px}.industry-tree-page .drawer-top{padding:15px}.industry-tree-page summary{min-height:34px}.industry-tree-page .facility-recipe .tiny-btn{min-height:32px}}
