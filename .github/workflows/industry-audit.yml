@@ -2,38 +2,133 @@ name: Industry source audit
 on:
   push:
     branches: [audit/industry-20260922]
+    paths: [audit/ready]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
+  actions: read
 jobs:
-  source:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
-      - name: Read anonymous official source and preserve evidence
+          ref: audit/industry-20260922
+          fetch-depth: 2
+      - id: mode
+        name: Resolve isolated build or read-only live verification
         run: |
-          mkdir -p audit-source
-          python - <<'PY'
-          import urllib.request, hashlib, pathlib, json, datetime
-          url='https://play.mercatorio.io/static/js/main.c8796e47.js'
-          data=urllib.request.urlopen(url, timeout=60).read()
-          digest=hashlib.sha256(data).hexdigest()
-          assert digest=='5f30ff16df6960e2b8986d2db17c79d71861e8688195493ef1ef355cac91f11a', digest
-          pathlib.Path('audit-source/main.c8796e47.js').write_bytes(data)
-          meta={'url':url,'sha256':digest,'fetched_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'authenticated':False,'scope':'anonymous official frontend, not account data'}
-          pathlib.Path('audit-source/source.json').write_text(json.dumps(meta,indent=2))
-          print(json.dumps(meta))
-          print('METADATA PREVIEW:', data.decode()[3057250:3058400])
-          PY
-      - uses: actions/upload-artifact@v4
+          if grep -q '^live:' audit/ready; then
+            echo mode=live >> "$GITHUB_OUTPUT"
+          else
+            echo mode=build >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v4
         with:
           name: industry-source-and-current-site
+          run-id: 35734798252
+          path: _baseline
+          github-token: ${{ github.token }}
+      - name: Unpack reviewed text and verify transfer checksum
+        run: |
+          python - <<'PY'
+          import base64,gzip,json,pathlib,hashlib
+          encoded=''.join(pathlib.Path(f'audit/payload-{i}.b64').read_text().strip() for i in range(4))
+          # Correct four transcription differences; the complete checksum must still match.
+          for old,new in [('VSsrWrWr2','VSsrWr2'),('HPOqVqVfq','HPOqVqVYfq'),('e9daHz5','e9Hz5'),('TdXrYrYID','TdXrYID')]:
+            encoded=encoded.replace(old,new)
+          assert hashlib.sha256(encoded.encode()).hexdigest()=='fa8b7ad991d37a760b2b617c137483df70e96c7d1ea1900a8e0e6e6b811bebe6'
+          data=json.loads(gzip.decompress(base64.b64decode(encoded)))
+          allowed={'build.py','test.py','industry/tree.html','assets/industry-tree.css','assets/industry-tree.js'}
+          assert set(data)==allowed
+          live=pathlib.Path('audit/ready').read_text().startswith('live:')
+          for name,text in data.items():
+            dest=pathlib.Path('.audit-runtime')/name
+            dest.parent.mkdir(parents=True,exist_ok=True);dest.write_text(text)
+            if name in {'industry/tree.html','assets/industry-tree.css','assets/industry-tree.js'} and not live:
+              pathlib.Path(name).write_text(text)
+            print(name,hashlib.sha256(text.encode()).hexdigest())
+          PY
+      - name: Install isolated rendering and browser test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y graphviz
+          python -m pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Rebuild all recipe layouts from pinned source
+        if: steps.mode.outputs.mode == 'build'
+        env:
+          SITE_ROOT: .
+          SOURCE_BUNDLE: _baseline/audit-source/main.c8796e47.js
+        run: python .audit-runtime/build.py
+      - name: Check integrity, HTTP navigation and desktop/mobile interactions
+        if: steps.mode.outputs.mode == 'build'
+        env:
+          SITE_ROOT: .
+          BASELINE_ROOT: _baseline
+          SOURCE_BUNDLE: _baseline/audit-source/main.c8796e47.js
+          REPORT_ROOT: _report
+        run: python .audit-runtime/test.py
+      - name: Commit only four tested industry files to isolation branch
+        if: steps.mode.outputs.mode == 'build'
+        run: |
+          git fetch origin audit/industry-20260922
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+          git add industry/tree.html assets/industry-tree.css assets/industry-tree.js assets/industry-data.json
+          python - <<'PY'
+          import subprocess
+          actual=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+          assert actual=={'industry/tree.html','assets/industry-tree.css','assets/industry-tree.js','assets/industry-data.json'},actual
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(industry): rebuild atlas from audited official frontend definitions'
+          git push origin HEAD:audit/industry-20260922
+          git rev-parse HEAD
+          git ls-tree HEAD industry/tree.html assets/industry-tree.css assets/industry-tree.js assets/industry-data.json index.html town/players.html assets/site.css
+      - name: Verify deployed bytes without game credentials
+        if: steps.mode.outputs.mode == 'live'
+        run: |
+          python - <<'PY'
+          import pathlib,hashlib,urllib.request,time,json,re
+          target=pathlib.Path('audit/ready').read_text().strip().split(':')[1]
+          assert re.fullmatch('[0-9a-f]{40}',target)
+          result={'target_commit':target,'base':'https://v86861062.github.io/my_mercatorio_info/','files':[]}
+          for name in ['index.html','industry/tree.html','assets/industry-tree.css','assets/industry-tree.js','assets/industry-data.json','town/players.html','assets/site.css']:
+            expected=hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()
+            for attempt in range(16):
+              try:
+                with urllib.request.urlopen(result['base']+name+'?audit='+target+'&attempt='+str(attempt),timeout=30) as response:
+                  actual=hashlib.sha256(response.read()).hexdigest();status=response.status
+                if actual==expected:break
+              except Exception as e:
+                actual=type(e).__name__;status=None
+              time.sleep(10)
+            assert actual==expected,(name,expected,actual)
+            result['files'].append({'path':name,'status':status,'sha256':actual})
+          pathlib.Path('_report').mkdir(exist_ok=True)
+          pathlib.Path('_report/live-bytes.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps(result,indent=2))
+          PY
+      - name: Test real Pages navigation and interactions
+        if: steps.mode.outputs.mode == 'live'
+        env:
+          SITE_ROOT: .
+          BASELINE_ROOT: _baseline
+          SOURCE_BUNDLE: _baseline/audit-source/main.c8796e47.js
+          REPORT_ROOT: _report
+          LIVE_BASE: https://v86861062.github.io/my_mercatorio_info/
+        run: python .audit-runtime/test.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: industry-built-and-tested
           path: |
-            audit-source/
-            assets/
+            _report/
+            audit/
             industry/
-            town/
+            assets/
             index.html
+            town/
           retention-days: 3
